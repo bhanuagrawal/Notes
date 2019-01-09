@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main_navigation"
+    app:startDestination="@id/allNotesFragment">
+
+    <fragment
+        android:id="@+id/allNotesFragment"
+        android:name="notes.bhanu.agrawal.notes.ui.AllNotesFragment"
+        android:label="fragment_all_notes"
+        tools:layout="@layout/fragment_all_notes" >
+        <action
+            android:id="@+id/action_allNotesFragment_to_singleNoteFragment"
+            app:destination="@id/singleNoteFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/createNoteFragment"
+        android:name="notes.bhanu.agrawal.notes.ui.CreateNoteFragment"
+        android:label="fragment_create_note2"
+        tools:layout="@layout/fragment_create_note2" >
+        <action
+            android:id="@+id/action_createNoteFragment_to_allNotesFragment"
+            app:destination="@id/allNotesFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/singleNoteFragment"
+        android:name="notes.bhanu.agrawal.notes.ui.SingleNoteFragment"
+        android:label="fragment_single_note"
+        tools:layout="@layout/fragment_single_note" />
+</navigation>
