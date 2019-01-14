@@ -232,8 +232,8 @@ public class CreateNoteFragment extends Fragment {
     @Override
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        notesViewModel.getmImageSaveWorkInfo().observe(getActivity(), workObserver);
-        notesViewModel.getNoteSaveStatusMutableLiveData().observe(getActivity(), noteSaveStatusObserver);
+        notesViewModel.getmImageSaveWorkInfo().observe(this, workObserver);
+        notesViewModel.getNoteSaveStatusMutableLiveData().observe(this, noteSaveStatusObserver);
     }
 
 
