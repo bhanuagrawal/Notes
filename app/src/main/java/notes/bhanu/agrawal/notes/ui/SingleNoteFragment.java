@@ -200,7 +200,7 @@ public class SingleNoteFragment extends Fragment {
     @Override
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        notesViewModel.getNotes().observe(getActivity(), notesObserver);
+        notesViewModel.getNotes().observe(this, notesObserver);
 
     }
 
