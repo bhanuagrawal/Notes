@@ -3,11 +3,11 @@ package notes.bhanu.agrawal.notes.ui;
 
 import android.Manifest;
 import android.app.ProgressDialog;
+import android.arch.lifecycle.Observer;
 import android.arch.lifecycle.ViewModelProviders;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
@@ -15,6 +15,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -23,16 +24,19 @@ import android.widget.EditText;
 import android.widget.Toast;
 
 import java.util.Date;
+import java.util.List;
 
+import androidx.work.Data;
+import androidx.work.WorkInfo;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import io.reactivex.Observable;
 import io.reactivex.ObservableEmitter;
 import io.reactivex.ObservableOnSubscribe;
-import io.reactivex.Observer;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
+import notes.bhanu.agrawal.notes.Constants;
 import notes.bhanu.agrawal.notes.NotesViewModel;
 import notes.bhanu.agrawal.notes.R;
 import notes.bhanu.agrawal.notes.Util;
@@ -79,8 +83,10 @@ public class CreateNoteFragment extends Fragment {
 
 
     private ProgressDialog dialog;
+    private Observer<List<WorkInfo>> workObserver;
+    private Observer<Util.NoteSaveStatus> noteSaveStatusObserver;
 
-    private String uploadImageUrl = "";
+
 
     public CreateNoteFragment() {
         // Required empty public constructor
@@ -114,9 +120,53 @@ public class CreateNoteFragment extends Fragment {
         notesViewModel = ViewModelProviders.of((FragmentActivity) getActivity()).get(NotesViewModel.class);
         dialog = new ProgressDialog(getContext());
         dialog.setMessage("Loading");
-        if(savedInstanceState!= null){
-            uploadImageUrl = savedInstanceState.getString(IMAGE_URL);
-        }
+
+
+        workObserver = (List<WorkInfo> workInfos) -> {
+
+            if (workInfos == null || workInfos.isEmpty()) {
+                return;
+            }
+
+            // We only care about the one output status.
+            // Every continuation has only one worker tagged TAG_OUTPUT
+            WorkInfo workInfo = workInfos.get(0);
+
+            boolean finished = workInfo.getState().isFinished();
+
+
+            if (!finished) {
+                dialog.show();
+            } else if(notesViewModel.getImageSaveWork() != null){
+
+                dialog.dismiss();
+                Toast.makeText(getActivity(), getString(R.string.image_added), Toast.LENGTH_SHORT).show();
+                Data outputData = workInfo.getOutputData();
+
+                String outputImageUri =
+                        outputData.getString(Constants.IMAGE_URL);
+
+                if (!TextUtils.isEmpty(outputImageUri)) {
+                    notesViewModel.setSavedImageUrl(outputImageUri);
+                }
+                imageUploadButton.setVisibility(View.GONE);
+
+            }
+        };
+
+
+        noteSaveStatusObserver = (Util.NoteSaveStatus noteSaveStatus) -> {
+            if(noteSaveStatus == Util.NoteSaveStatus.SAVING){
+                dialog.show();
+            }
+            else if(noteSaveStatus == Util.NoteSaveStatus.SAVED){
+                dialog.dismiss();
+                notesViewModel.setSavedImageUrl(null);
+                notesViewModel.setImageSaveWork(null);
+                notesViewModel.getNoteSaveStatusMutableLiveData().postValue(Util.NoteSaveStatus.NOT_SAVED);
+                mListener.navigateTo(R.id.action_createNoteFragment_to_allNotesFragment, null);
+            }
+        };
     }
 
     @Override
@@ -151,60 +201,11 @@ public class CreateNoteFragment extends Fragment {
             @Override
             public void onClick(View view) {
 
-
-
                 if(title.getText().toString().isEmpty()){
                     Toast.makeText(getContext(), "Title cannot be empty", Toast.LENGTH_LONG).show();
                     return;
                 }
-
-
-
-                Observable<Void> o = Observable.create(new ObservableOnSubscribe<Void>() {
-                    @Override
-                    public void subscribe(ObservableEmitter<Void> emitter) throws Exception {
-                        try {
-                            notesViewModel.addNote(new Note(title.getText().toString(), text.getText().toString(), new Date(), uploadImageUrl));
-                            emitter.onComplete();
-                        }
-                        catch (Exception e){
-                            emitter.onError(e);
-                        }
-                    }
-
-
-                }).subscribeOn(Schedulers.newThread()).
-                        observeOn(AndroidSchedulers.mainThread());
-
-
-                o.subscribe(new Observer<Void>() {
-                    @Override
-                    public void onSubscribe(Disposable d) {
-                        dialog.show();
-                    }
-
-                    @Override
-                    public void onNext(Void aVoid) {
-                    }
-
-                    @Override
-                    public void onError(Throwable e) {
-                        Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_LONG).show();
-                        if(dialog.isShowing()){
-                            dialog.dismiss();
-
-                        }
-                    }
-
-                    @Override
-                    public void onComplete() {
-                        mListener.navigateTo(R.id.allNotesFragment, null);
-                        if(dialog.isShowing()){
-                            dialog.dismiss();
-
-                        }
-                    }
-                });
+                notesViewModel.addNote(new Note(title.getText().toString(), text.getText().toString(), new Date(), notesViewModel.getSavedImageUrl()));
 
             }
         });
@@ -229,65 +230,19 @@ public class CreateNoteFragment extends Fragment {
     }
 
     @Override
+    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+        notesViewModel.getmImageSaveWorkInfo().observe(getActivity(), workObserver);
+        notesViewModel.getNoteSaveStatusMutableLiveData().observe(getActivity(), noteSaveStatusObserver);
+    }
+
+
+    @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == RESULT_LOAD_IMAGE && resultCode == RESULT_OK && null !=data){
-            saveImage(data.getData());
-            
+            notesViewModel.saveImage(data.getData());
         }
-    }
-
-    private void saveImage(final Uri uri) {
-
-        Observable<String> o = Observable.create(new ObservableOnSubscribe<String>() {
-            @Override
-            public void subscribe(ObservableEmitter<String> emitter) throws Exception {
-                try {
-                    String url = Util.saveToInternalStorage(getContext(), uri);
-                    emitter.onNext(url);
-                    emitter.onComplete();
-
-                }
-                catch (Exception e) {
-                    emitter.onError(e);
-                }
-            }
-
-
-        }).subscribeOn(Schedulers.newThread())
-                .observeOn(AndroidSchedulers.mainThread());
-
-        o.subscribe(new Observer<String>() {
-            @Override
-            public void onSubscribe(Disposable d) {
-                dialog.show();
-            }
-
-            @Override
-            public void onNext(String s) {
-                uploadImageUrl = s;
-            }
-
-            @Override
-            public void onError(Throwable e) {
-                if(dialog.isShowing()){
-                    dialog.dismiss();
-                }
-                Toast.makeText(getContext(), e.getMessage(), Toast.LENGTH_LONG).show();
-
-            }
-
-            @Override
-            public void onComplete() {
-                if(dialog.isShowing()){
-                    dialog.dismiss();
-                }
-                Toast.makeText(getContext(), "Image added to note", Toast.LENGTH_LONG).show();
-                imageUploadButton.setVisibility(View.GONE);
-            }
-        });
-
-
     }
 
     @Override
@@ -306,9 +261,15 @@ public class CreateNoteFragment extends Fragment {
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        if(uploadImageUrl != null){
-            outState.putString(IMAGE_URL, uploadImageUrl);
-        }
+    }
+
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        notesViewModel.getmImageSaveWorkInfo().removeObserver(workObserver);
+        notesViewModel.getNoteSaveStatusMutableLiveData().removeObserver(noteSaveStatusObserver);
+
     }
 
     @Override
@@ -316,4 +277,6 @@ public class CreateNoteFragment extends Fragment {
         super.onDetach();
         mListener = null;
     }
+
+
 }

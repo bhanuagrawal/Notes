@@ -21,11 +21,21 @@
         tools:layout="@layout/fragment_create_note2" >
         <action
             android:id="@+id/action_createNoteFragment_to_allNotesFragment"
-            app:destination="@id/allNotesFragment" />
+            app:destination="@id/allNotesFragment"
+            app:launchSingleTop="true"
+            app:popUpTo="@+id/allNotesFragment"
+            app:popUpToInclusive="true" />
     </fragment>
     <fragment
         android:id="@+id/singleNoteFragment"
         android:name="notes.bhanu.agrawal.notes.ui.SingleNoteFragment"
         android:label="fragment_single_note"
-        tools:layout="@layout/fragment_single_note" />
+        tools:layout="@layout/fragment_single_note" >
+        <action
+            android:id="@+id/action_singleNoteFragment_to_allNotesFragment"
+            app:destination="@id/allNotesFragment"
+            app:launchSingleTop="true"
+            app:popUpTo="@+id/allNotesFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
 </navigation>

@@ -110,12 +110,15 @@ public class SingleNoteFragment extends Fragment {
                         return;
                     }
                 }
-
-                mListener.navigateTo(R.id.allNotesFragment, null);
+                closeFragment();
 
             }
         };
 
+    }
+
+    private void closeFragment() {
+        mListener.navigateTo(R.id.action_singleNoteFragment_to_allNotesFragment, null);
     }
 
     private void bindToView(final Note note) {
